@@ -1,22 +1,20 @@
 package com.feth.play.module.pa;
 
-import java.util.Date;
+import com.feth.play.module.pa.exceptions.AuthException;
+import com.feth.play.module.pa.providers.AuthProvider;
+import com.feth.play.module.pa.service.UserService;
+import com.feth.play.module.pa.user.AuthUser;
 
 import play.Configuration;
 import play.Logger;
 import play.Play;
 import play.i18n.Messages;
-import play.mvc.Call;
-import play.mvc.Controller;
-import play.mvc.Http;
+import play.mvc.*;
 import play.mvc.Http.Context;
 import play.mvc.Http.Session;
 import play.mvc.Result;
 
-import com.feth.play.module.pa.exceptions.AuthException;
-import com.feth.play.module.pa.providers.AuthProvider;
-import com.feth.play.module.pa.service.UserService;
-import com.feth.play.module.pa.user.AuthUser;
+import java.util.Date;
 
 public abstract class PlayAuthenticate {
 
@@ -442,7 +440,9 @@ public abstract class PlayAuthenticate {
 			final Object o = ap.authenticate(context, payload);
 			if (o instanceof String) {
 				return Controller.redirect((String) o);
-			} else if (o instanceof AuthUser) {
+			}else if(o instanceof Result){
+                return (Result) o;
+            }else if (o instanceof AuthUser) {
 
 				final AuthUser newUser = (AuthUser) o;
 				final Session session = context.session();

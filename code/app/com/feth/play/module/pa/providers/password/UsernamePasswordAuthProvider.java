@@ -1,15 +1,5 @@
 package com.feth.play.module.pa.providers.password;
 
-import java.util.Arrays;
-import java.util.List;
-
-import play.Application;
-import play.data.Form;
-import play.mvc.Call;
-import play.mvc.Http;
-import play.mvc.Http.Context;
-import play.mvc.Result;
-
 import com.feth.play.module.mail.Mailer;
 import com.feth.play.module.mail.Mailer.Mail;
 import com.feth.play.module.mail.Mailer.Mail.Body;
@@ -18,6 +8,15 @@ import com.feth.play.module.pa.exceptions.AuthException;
 import com.feth.play.module.pa.providers.AuthProvider;
 import com.feth.play.module.pa.user.AuthUser;
 import com.feth.play.module.pa.user.NameIdentity;
+import play.Application;
+import play.data.Form;
+import play.mvc.Call;
+import play.mvc.Http;
+import play.mvc.Http.Context;
+import play.mvc.Result;
+
+import java.util.Arrays;
+import java.util.List;
 
 public abstract class UsernamePasswordAuthProvider<R, UL extends UsernamePasswordAuthUser, US extends UsernamePasswordAuthUser, L extends UsernamePasswordAuthProvider.UsernamePassword, S extends UsernamePasswordAuthProvider.UsernamePassword>
 		extends AuthProvider {
@@ -88,7 +87,7 @@ public abstract class UsernamePasswordAuthProvider<R, UL extends UsernamePasswor
 			switch (r) {
 			case USER_EXISTS:
 				// The user exists already
-				return userExists(authUser).url();
+				return userExists(authUser);
 			case USER_EXISTS_UNVERIFIED:
 			case USER_CREATED_UNVERIFIED:
 				// User got created as unverified
@@ -215,7 +214,7 @@ public abstract class UsernamePasswordAuthProvider<R, UL extends UsernamePasswor
 
 	protected abstract Form<L> getLoginForm();
 
-	protected abstract Call userExists(final UsernamePasswordAuthUser authUser);
+	protected abstract Result userExists(final UsernamePasswordAuthUser authUser);
 
 	protected abstract Call userUnverified(
 			final UsernamePasswordAuthUser authUser);

@@ -37,7 +37,7 @@ public abstract class UsernamePasswordAuthUser extends AuthUser implements Email
 
 	@Override
 	public String getId() {
-		return getHashedPassword();
+		throw new UnsupportedOperationException("todo");
 	}
 
 	@Override

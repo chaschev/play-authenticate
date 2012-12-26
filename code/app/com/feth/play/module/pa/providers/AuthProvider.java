@@ -1,10 +1,9 @@
 package com.feth.play.module.pa.providers;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
+import com.feth.play.module.pa.PlayAuthenticate;
+import com.feth.play.module.pa.exceptions.AuthException;
+import com.feth.play.module.pa.user.AuthUser;
+import com.feth.play.module.pa.user.SessionAuthUser;
 import play.Application;
 import play.Configuration;
 import play.Logger;
@@ -12,10 +11,10 @@ import play.Plugin;
 import play.mvc.Http.Context;
 import play.mvc.Http.Request;
 
-import com.feth.play.module.pa.PlayAuthenticate;
-import com.feth.play.module.pa.exceptions.AuthException;
-import com.feth.play.module.pa.user.AuthUser;
-import com.feth.play.module.pa.user.SessionAuthUser;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public abstract class AuthProvider extends Plugin {
 

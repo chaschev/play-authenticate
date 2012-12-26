@@ -2,14 +2,16 @@ package com.feth.play.module.pa;
 
 import com.feth.play.module.pa.exceptions.AuthException;
 import com.feth.play.module.pa.providers.AuthProvider;
+import com.feth.play.module.pa.providers.password.UsernamePasswordAuthProvider;
 import com.feth.play.module.pa.service.UserService;
 import com.feth.play.module.pa.user.AuthUser;
-
 import play.Configuration;
 import play.Logger;
 import play.Play;
 import play.i18n.Messages;
-import play.mvc.*;
+import play.mvc.Call;
+import play.mvc.Controller;
+import play.mvc.Http;
 import play.mvc.Http.Context;
 import play.mvc.Http.Session;
 import play.mvc.Result;
@@ -173,7 +175,11 @@ public abstract class PlayAuthenticate {
 		}
 	}
 
-	public static boolean isLoggedIn(final Session session) {
+    public static boolean isLoggedIn(final Session session) {
+        return isLoggedIn(session, null);
+    }
+
+    public static boolean isLoggedIn(final Session session, Context context) {
 		boolean ret = session.containsKey(USER_KEY) // user is set
 				&& session.containsKey(PROVIDER_KEY); // provider is set
 		ret &= AuthProvider.Registry.hasProvider(session.get(PROVIDER_KEY)); // this
@@ -188,6 +194,17 @@ public abstract class PlayAuthenticate {
 															// expires after now
 			}
 		}
+
+        if(!ret){
+            final AuthUser authUser = tryLoginViaRememberMe(context);
+
+            if(authUser != null){
+                ret = true;
+
+                storeUser(session, authUser);
+            }
+        }
+
 		return ret;
 	}
 
@@ -199,6 +216,8 @@ public abstract class PlayAuthenticate {
 		// shouldn't be in any more, but just in case lets kill it from the
 		// cookie
 		session.remove(ORIGINAL_URL);
+
+        UsernamePasswordAuthProvider.removeRememberMeCookie(Context.current());
 
 		return Controller.redirect(getUrl(getResolver().afterLogout(),
 				SETTING_KEY_AFTER_LOGOUT_FALLBACK));
@@ -226,20 +245,56 @@ public abstract class PlayAuthenticate {
 		return expires;
 	}
 
-	public static AuthUser getUser(final Session session) {
+    public static AuthUser getUser(final Session session) {
+        return getUser(session, true);
+    }
+
+    public static AuthUser getUser(final Session session, boolean tryLoginViaRememberMe) {
+        return getUser(session, null, tryLoginViaRememberMe);
+    }
+
+    public static AuthUser getUser(final Session session, Context context, boolean tryLoginViaRememberMe) {
 		final String provider = session.get(PROVIDER_KEY);
 		final String id = session.get(USER_KEY);
 		final long expires = getExpiration(session);
 
-		if (provider != null && id != null) {
-			return getProvider(provider).getSessionAuthUser(id, expires);
+        final AuthProvider authProvider = getProvider(provider);
+
+        AuthUser user;
+
+        if (provider != null && id != null) {
+            user = authProvider.getSessionAuthUser(id, expires);
 		} else {
-			return null;
+            user = null;
 		}
+
+        if(user == null && tryLoginViaRememberMe){
+            user = tryLoginViaRememberMe(context);
+        }
+
+        return user;
 	}
 
-	public static AuthUser getUser(final Context context) {
-		return getUser(context.session());
+    private static AuthUser tryLoginViaRememberMe(Context context) {
+        AuthUser user = null;
+        final UsernamePasswordAuthProvider passwordProvider = (UsernamePasswordAuthProvider) getProvider(UsernamePasswordAuthProvider.PROVIDER_KEY);
+
+        if(passwordProvider != null && passwordProvider.isRememberMeEnabled()){
+            if(context == null){
+                context = Context.current();
+            }
+
+            user = passwordProvider.getRememberedUser(context);
+
+            if(user != null){
+                storeUser(context.session(), user);
+            }
+        }
+        return user;
+    }
+
+    public static AuthUser getUser(final Context context) {
+		return getUser(context.session(), context, true);
 	}
 
 	public static boolean isAccountAutoMerge() {
@@ -405,7 +460,7 @@ public abstract class PlayAuthenticate {
 		if (merge) {
 			// User accepted merge, so do it
 			loginUser = getUserService().merge(mergeUser,
-					getUser(context.session()));
+                    getUser(context.session()));
 		} else {
 			// User declined merge, so log out the old user, and log out with
 			// the new one
@@ -426,22 +481,22 @@ public abstract class PlayAuthenticate {
 		return loginUser;
 	}
 
-	public static Result handleAuthentication(final String provider,
+	public static Object handleAuthentication(final String provider,
 			final Context context, final Object payload) {
 		final AuthProvider ap = getProvider(provider);
 		if (ap == null) {
 			// Provider wasn't found and/or user was fooling with our stuff -
 			// tell him off:
 			return Controller.notFound(Messages.get(
-					"playauthenticate.core.exception.provider_not_found",
-					provider));
+                    "playauthenticate.core.exception.provider_not_found",
+                    provider));
 		}
 		try {
 			final Object o = ap.authenticate(context, payload);
 			if (o instanceof String) {
 				return Controller.redirect((String) o);
-			}else if(o instanceof Result){
-                return (Result) o;
+			}else if(o instanceof Result || o instanceof play.api.mvc.Result){
+                return o;
             }else if (o instanceof AuthUser) {
 
 				final AuthUser newUser = (AuthUser) o;
@@ -463,10 +518,10 @@ public abstract class PlayAuthenticate {
 				// are
 				// not logged in (does NOT check expiration)
 
-				AuthUser oldUser = getUser(session);
+				AuthUser oldUser = getUser(session, false);
 
 				// checks if the user is logged in (also checks the expiration!)
-				boolean isLoggedIn = isLoggedIn(session);
+				boolean isLoggedIn = isLoggedIn(session, context);
 
 				Object oldIdentity = null;
 

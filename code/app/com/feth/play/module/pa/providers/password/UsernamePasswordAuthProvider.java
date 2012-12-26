@@ -6,39 +6,62 @@ import com.feth.play.module.mail.Mailer.Mail.Body;
 import com.feth.play.module.pa.PlayAuthenticate;
 import com.feth.play.module.pa.exceptions.AuthException;
 import com.feth.play.module.pa.providers.AuthProvider;
+import com.feth.play.module.pa.security.Crypto;
+import com.feth.play.module.pa.service.UserService;
 import com.feth.play.module.pa.user.AuthUser;
 import com.feth.play.module.pa.user.NameIdentity;
+import org.mindrot.jbcrypt.BCrypt;
 import play.Application;
+import play.Configuration;
+import play.Logger;
+import play.Play;
 import play.data.Form;
+import play.libs.Time;
 import play.mvc.Call;
 import play.mvc.Http;
 import play.mvc.Http.Context;
-import play.mvc.Result;
 
 import java.util.Arrays;
 import java.util.List;
 
-public abstract class UsernamePasswordAuthProvider<R, UL extends UsernamePasswordAuthUser, US extends UsernamePasswordAuthUser, L extends UsernamePasswordAuthProvider.UsernamePassword, S extends UsernamePasswordAuthProvider.UsernamePassword>
+public abstract class UsernamePasswordAuthProvider<R, UL extends UsernamePasswordAuthUser, US extends UsernamePasswordAuthUser, L extends UsernamePasswordAuthProvider.UsernamePassword, S extends UsernamePasswordAuthProvider.UsernamePassword, RESULT>
 		extends AuthProvider {
 
-	protected static final String PROVIDER_KEY = "password";
+	public static final String PROVIDER_KEY = "password";
 
 	protected static final String SETTING_KEY_MAIL = "mail";
 
-	private static final String SETTING_KEY_MAIL_FROM_EMAIL = Mailer.SettingKeys.FROM_EMAIL;
+//    protected static final String SETTING_MAX_LOGIN_ATTEMPTS = "maxLoginAttempts";
+
+    protected static final String SETTING_APPLICATION_SECRET = "application.secret";
+
+    private static final String SETTING_KEY_MAIL_FROM_EMAIL = Mailer.SettingKeys.FROM_EMAIL;
 
 	private static final String SETTING_KEY_MAIL_DELAY = Mailer.SettingKeys.DELAY;
 
 	private static final String SETTING_KEY_MAIL_FROM = Mailer.SettingKeys.FROM;
 
-	@Override
+    private static final String REMEMBER_ME_COOKIE = "play_rememberMe";
+
+    protected static final String SETTING_REMEMBER_ME_COOKIE_AGE = "rememberMeCookieAge";
+
+    protected Mailer mailer;
+
+//    protected int maxLoginAttempts;
+
+    protected int rememberMeCookieAgeSec;
+    protected String rememberMeSecret;
+
+
+    @Override
 	protected List<String> neededSettingKeys() {
-		return Arrays.asList(SETTING_KEY_MAIL + "." + SETTING_KEY_MAIL_DELAY,
-				SETTING_KEY_MAIL + "." + SETTING_KEY_MAIL_FROM + "."
-						+ SETTING_KEY_MAIL_FROM_EMAIL);
+		return Arrays.asList(
+                SETTING_KEY_MAIL + "." + SETTING_KEY_MAIL_DELAY,
+                SETTING_KEY_MAIL + "." + SETTING_KEY_MAIL_FROM + "." + SETTING_KEY_MAIL_FROM_EMAIL,
+                SETTING_REMEMBER_ME_COOKIE_AGE
+        );
 	}
 
-	protected Mailer mailer;
 
 	private enum Case {
 		SIGNUP, LOGIN
@@ -66,8 +89,11 @@ public abstract class UsernamePasswordAuthProvider<R, UL extends UsernamePasswor
 	@Override
 	public void onStart() {
 		super.onStart();
-		mailer = Mailer.getCustomMailer(getConfiguration().getConfig(
-				SETTING_KEY_MAIL));
+        final Configuration c = getConfiguration();
+        mailer = Mailer.getCustomMailer(c.getConfig(SETTING_KEY_MAIL));
+//        maxLoginAttempts = c.getInt(SETTING_MAX_LOGIN_ATTEMPTS);
+        rememberMeCookieAgeSec = Time.parseDuration(c.getString(SETTING_REMEMBER_ME_COOKIE_AGE));
+        rememberMeSecret = Play.application().configuration().getString(SETTING_APPLICATION_SECRET).substring(0, 16);
 	}
 
 	@Override
@@ -75,7 +101,7 @@ public abstract class UsernamePasswordAuthProvider<R, UL extends UsernamePasswor
 		return PROVIDER_KEY;
 	}
 
-	@Override
+    @Override
 	public Object authenticate(final Context context, final Object payload)
 			throws AuthException {
 
@@ -111,6 +137,10 @@ public abstract class UsernamePasswordAuthProvider<R, UL extends UsernamePasswor
 				return userUnverified(authUser).url();
 			case USER_LOGGED_IN:
 				// The user exists and the given password was correct
+                if(isRememberMeEnabled()){
+                    setRememberMeCookie(authUser, true, context.response());
+                }
+
 				return authUser;
 			case WRONG_PASSWORD:
 				// don't expose this - it might harm users privacy if anyone
@@ -126,21 +156,90 @@ public abstract class UsernamePasswordAuthProvider<R, UL extends UsernamePasswor
 		}
 	}
 
-	protected String onLoginUserNotFound(Context context) {
+    public boolean isRememberMeEnabled() {
+        return rememberMeCookieAgeSec > 0;
+    }
+
+
+    private static Http.Cookie getRememberMeCookie(Http.Request request) {
+        return request.cookies().get(REMEMBER_ME_COOKIE);
+    }
+
+    private void setRememberMeCookie(UL user, boolean javaScriptOn, Http.Response response) {
+        final UsernamePasswordAuthUser userWithPassword = PlayAuthenticate.getUserService().findUser(new SessionUsernamePasswordAuthUser("", user.getEmail(), Long.MAX_VALUE / 4));
+
+        String javaScriptOnChar = javaScriptOn ? "Y" : "N";
+        String rememberMeKey = javaScriptOnChar + user.getEmail() + "|" +
+                BCrypt.hashpw(createCookiePassword(userWithPassword), BCrypt.gensalt(5));
+
+        String cookieValue = Crypto.encryptAES(rememberMeKey, rememberMeSecret);
+
+        response.setCookie(REMEMBER_ME_COOKIE, cookieValue, rememberMeCookieAgeSec);
+    }
+
+
+    public UsernamePasswordAuthUser getRememberedUser(Context context) {
+        final UserService userService = PlayAuthenticate.getUserService();
+
+        boolean remembered = false;
+
+        final Http.Request request = context.request();
+
+        final Http.Cookie cookie = getRememberMeCookie(request);
+
+        if(nonEmptyCookie(cookie)){
+            final String cookieValue = Crypto.decryptAES(cookie.value(), rememberMeSecret);
+
+            final int delimiterIndex1 = cookieValue.indexOf('|');
+
+            String email = cookieValue.substring(1, delimiterIndex1);
+            String passwordHash = cookieValue.substring(delimiterIndex1 + 1);
+
+            try {
+                UsernamePasswordAuthUser authUser = userService.findUser((SessionUsernamePasswordAuthUser)getSessionAuthUser(email, Long.MAX_VALUE / 4));
+
+                remembered = authUser != null && BCrypt.checkpw(createCookiePassword(authUser), passwordHash);
+
+                return remembered ? authUser : null;
+            } catch (Exception e) {
+                remembered = false;
+                Logger.warn("unable to check remember me password", e);
+            }finally {
+                if(!remembered){
+                    removeRememberMeCookie(context);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public static void removeRememberMeCookie(Context context) {
+        context.response().discardCookies(REMEMBER_ME_COOKIE);
+    }
+
+    private String createCookiePassword(UsernamePasswordAuthUser user) {
+        return user.getEmail() + ":" + user.getPassword();
+    }
+
+    private static boolean nonEmptyCookie(Http.Cookie cookie) {
+        return cookie != null && cookie.value() != null && cookie.value().length() > 3;
+    }
+
+    protected String onLoginUserNotFound(Context context) {
 		return PlayAuthenticate.getResolver().login().url();
 	}
 
-	public static Result handleLogin(final Context ctx) {
-		return PlayAuthenticate.handleAuthentication(PROVIDER_KEY, ctx,
-				Case.LOGIN);
+	public static Object handleLogin(final Context ctx) {
+		return PlayAuthenticate.handleAuthentication(PROVIDER_KEY, ctx, Case.LOGIN);
 	}
 
 	@Override
 	public AuthUser getSessionAuthUser(final String id, final long expires) {
-		return new SessionUsernamePasswordAuthUser(getKey(), id, expires);
+        return new SessionUsernamePasswordAuthUser(getKey(), id, expires);
 	}
 
-	public static Result handleSignup(final Context ctx) {
+	public static Object handleSignup(final Context ctx) {
 		return PlayAuthenticate.handleAuthentication(PROVIDER_KEY, ctx,
 				Case.SIGNUP);
 	}
@@ -214,7 +313,7 @@ public abstract class UsernamePasswordAuthProvider<R, UL extends UsernamePasswor
 
 	protected abstract Form<L> getLoginForm();
 
-	protected abstract Result userExists(final UsernamePasswordAuthUser authUser);
+	protected abstract RESULT userExists(final UsernamePasswordAuthUser authUser);
 
 	protected abstract Call userUnverified(
 			final UsernamePasswordAuthUser authUser);

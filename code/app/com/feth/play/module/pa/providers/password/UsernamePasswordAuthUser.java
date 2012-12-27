@@ -58,10 +58,14 @@ public abstract class UsernamePasswordAuthUser extends AuthUser implements Email
 	 * You *SHOULD* provide your own implementation of this which implements your own security.
 	 */
 	protected String createPassword(final String clearString) {
-		return BCrypt.hashpw(clearString, BCrypt.gensalt());
+		return hashPassword(clearString);
 	}
-	
-	/**
+
+    public static String hashPassword(String clearString) {
+        return BCrypt.hashpw(clearString, BCrypt.gensalt());
+    }
+
+    /**
 	 * You *SHOULD* provide your own implementation of this which implements your own security.
 	 */
 	public boolean checkPassword(final String hashed, final String candidate) {

@@ -80,6 +80,8 @@ public abstract class UsernamePasswordAuthProvider<R, UL extends UsernamePasswor
 		public String getEmail();
 
 		public String getPassword();
+
+        public boolean isRememberMe();
 	}
 
 	public UsernamePasswordAuthProvider(final Application app) {
@@ -137,7 +139,7 @@ public abstract class UsernamePasswordAuthProvider<R, UL extends UsernamePasswor
 				return userUnverified(authUser).url();
 			case USER_LOGGED_IN:
 				// The user exists and the given password was correct
-                if(isRememberMeEnabled()){
+                if(login.isRememberMe() && isRememberMeEnabled()){
                     setRememberMeCookie(authUser, true, context.response());
                 }
 

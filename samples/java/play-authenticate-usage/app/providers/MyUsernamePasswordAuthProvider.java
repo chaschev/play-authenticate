@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static service.DbService.db;
 import static play.data.Form.form;
 
 public class MyUsernamePasswordAuthProvider
@@ -124,7 +125,7 @@ public class MyUsernamePasswordAuthProvider
 
 	@Override
 	protected com.feth.play.module.pa.providers.password.UsernamePasswordAuthProvider.SignupResult signupUser(final MyUsernamePasswordAuthUser user) {
-		final User u = User.findByUsernamePasswordIdentity(user);
+		final User u = db.findByUsernamePasswordIdentity(user);
 		if (u != null) {
 			if (u.emailValidated) {
 				// This user exists, has its email validated and is active
@@ -148,7 +149,7 @@ public class MyUsernamePasswordAuthProvider
 	@Override
 	protected com.feth.play.module.pa.providers.password.UsernamePasswordAuthProvider.LoginResult loginUser(
 			final MyLoginUsernamePasswordAuthUser authUser) {
-		final User u = User.findByUsernamePasswordIdentity(authUser);
+		final User u = db.findByUsernamePasswordIdentity(authUser);
 		if (u == null) {
 			return LoginResult.NOT_FOUND;
 		} else {
@@ -247,7 +248,7 @@ public class MyUsernamePasswordAuthProvider
 	@Override
 	protected String generateVerificationRecord(
 			final MyUsernamePasswordAuthUser user) {
-		return generateVerificationRecord(User.findByAuthUserIdentity(user));
+		return generateVerificationRecord(db.findByAuthUserIdentity(user));
 	}
 
 	protected String generateVerificationRecord(final User user) {

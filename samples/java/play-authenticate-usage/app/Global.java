@@ -13,6 +13,8 @@ import play.Application;
 import play.GlobalSettings;
 import play.mvc.Call;
 
+import static service.DbService.db;
+
 public class Global extends GlobalSettings {
 
 	public void onStart(Application app) {
@@ -71,12 +73,12 @@ public class Global extends GlobalSettings {
 	}
 
 	private void initialData() {
-		if (SecurityRole.find.findRowCount() == 0) {
+		if (db.countRoles() == 0) {
 			for (final String roleName : Arrays
 					.asList(controllers.Application.USER_ROLE)) {
 				final SecurityRole role = new SecurityRole();
 				role.roleName = roleName;
-				role.save();
+                db.save(role);
 			}
 		}
 	}

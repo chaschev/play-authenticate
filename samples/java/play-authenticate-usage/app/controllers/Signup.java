@@ -15,6 +15,7 @@ import views.html.account.signup.*;
 
 import com.feth.play.module.pa.PlayAuthenticate;
 
+import static service.DbService.db;
 import static play.data.Form.form;
 
 public class Signup extends Controller {
@@ -79,7 +80,7 @@ public class Signup extends Controller {
 							"playauthenticate.reset_password.message.instructions_sent",
 							email));
 
-			final User user = User.findByEmail(email);
+			final User user = db.findByEmail(email);
 			if (user != null) {
 				// yep, we have a user with this email that is active - we do
 				// not know if the user owning that account has requested this
@@ -120,7 +121,7 @@ public class Signup extends Controller {
 	private static TokenAction tokenIsValid(final String token, final Type type) {
 		TokenAction ret = null;
 		if (token != null && !token.trim().isEmpty()) {
-			final TokenAction ta = TokenAction.findByToken(token, type);
+			final TokenAction ta = db.findByToken(token, type);
 			if (ta != null && ta.isValid()) {
 				ret = ta;
 			}
@@ -200,7 +201,7 @@ public class Signup extends Controller {
 			return badRequest(no_token_or_invalid.render());
 		}
 		final String email = ta.targetUser.email;
-		User.verify(ta.targetUser);
+		db.verify(ta.targetUser);
 		flash(Application.FLASH_MESSAGE_KEY,
 				Messages.get("playauthenticate.verify_email.success", email));
 		if (Application.getLocalUser(session()) != null) {

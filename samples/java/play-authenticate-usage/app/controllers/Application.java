@@ -7,7 +7,6 @@ import models.User;
 import play.Routes;
 import play.data.Form;
 import play.mvc.*;
-import play.mvc.Http.Response;
 import play.mvc.Http.Session;
 import play.mvc.Result;
 import providers.MyUsernamePasswordAuthProvider;
@@ -22,6 +21,8 @@ import com.feth.play.module.pa.PlayAuthenticate;
 import com.feth.play.module.pa.providers.password.UsernamePasswordAuthProvider;
 import com.feth.play.module.pa.user.AuthUser;
 
+import static service.DbService.db;
+
 public class Application extends Controller {
 
 	public static final String FLASH_MESSAGE_KEY = "message";
@@ -34,7 +35,7 @@ public class Application extends Controller {
 
 	public static User getLocalUser(final Session session) {
 		final AuthUser currentAuthUser = PlayAuthenticate.getUser(session);
-		final User localUser = User.findByAuthUserIdentity(currentAuthUser);
+		final User localUser = db.findByAuthUserIdentity(currentAuthUser);
 		return localUser;
 	}
 

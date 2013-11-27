@@ -1,15 +1,14 @@
 package security;
 
-import models.User;
+import be.objectify.deadbolt.core.models.Subject;
+import be.objectify.deadbolt.java.AbstractDeadboltHandler;
+import be.objectify.deadbolt.java.DynamicResourceHandler;
+import com.feth.play.module.pa.PlayAuthenticate;
+import com.feth.play.module.pa.user.AuthUserIdentity;
+import service.DbService;
 import play.libs.F;
 import play.mvc.Http;
 import play.mvc.SimpleResult;
-import be.objectify.deadbolt.java.AbstractDeadboltHandler;
-import be.objectify.deadbolt.java.DynamicResourceHandler;
-import be.objectify.deadbolt.core.models.Subject;
-
-import com.feth.play.module.pa.PlayAuthenticate;
-import com.feth.play.module.pa.user.AuthUserIdentity;
 
 public class MyDeadboltHandler extends AbstractDeadboltHandler {
 
@@ -43,7 +42,7 @@ public class MyDeadboltHandler extends AbstractDeadboltHandler {
 	public Subject getSubject(final Http.Context context) {
 		final AuthUserIdentity u = PlayAuthenticate.getUser(context);
 		// Caching might be a good idea here
-		return User.findByAuthUserIdentity(u);
+		return DbService.db.findByAuthUserIdentity(u);
 	}
 
 	@Override

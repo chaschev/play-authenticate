@@ -12,7 +12,12 @@ object Build extends sbt.Build {
       // Comment this for local development of the Play Authentication core
       "com.feth"      %%  "play-authenticate" % "0.5.2-SNAPSHOT",
       "postgresql"    %   "postgresql"        % "9.1-901-1.jdbc4",
-      javaCore,
+      "mysql" % "mysql-connector-java" % "5.1.27",
+      "org.mongodb.morphia" % "morphia" % "0.105",
+      "com.fasterxml.jackson.core" % "jackson-databind" % "2.3.0",
+      "com.google.code.gson" % "gson" % "2.2.4",
+      "org.mongodb" % "mongo-java-driver" % "2.11.3",
+        javaCore,
       javaJdbc,
       javaEbean
     )

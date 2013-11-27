@@ -4,13 +4,11 @@ import be.objectify.deadbolt.core.models.Permission;
 import be.objectify.deadbolt.core.models.Role;
 import be.objectify.deadbolt.core.models.Subject;
 import com.avaje.ebean.Ebean;
-import com.avaje.ebean.ExpressionList;
 import com.feth.play.module.pa.providers.password.UsernamePasswordAuthUser;
 import com.feth.play.module.pa.user.AuthUser;
-import com.feth.play.module.pa.user.AuthUserIdentity;
 import com.feth.play.module.pa.user.EmailIdentity;
-import com.feth.play.module.pa.user.NameIdentity;
 import com.feth.play.module.pa.user.FirstLastNameIdentity;
+import com.feth.play.module.pa.user.NameIdentity;
 import models.TokenAction.Type;
 import play.data.format.Formats;
 import play.data.validation.Constraints;
@@ -18,6 +16,8 @@ import play.db.ebean.Model;
 
 import javax.persistence.*;
 import java.util.*;
+
+import static service.DbService.db;
 
 /**
  * Initial version based on work by Steve Chaloner (steve@objectify.be) for
@@ -62,8 +62,8 @@ public class User extends Model implements Subject {
 	@ManyToMany
 	public List<UserPermission> permissions;
 
-	public static final Finder<Long, User> find = new Finder<Long, User>(
-			Long.class, User.class);
+//	public static final Finder<Long, User> find = new Finder<Long, User>(
+//			Long.class, User.class);
 
 	@Override
 	public String getIdentifier()
@@ -81,45 +81,45 @@ public class User extends Model implements Subject {
 		return permissions;
 	}
 
-	public static boolean existsByAuthUserIdentity(
-			final AuthUserIdentity identity) {
-		final ExpressionList<User> exp;
-		if (identity instanceof UsernamePasswordAuthUser) {
-			exp = getUsernamePasswordAuthUserFind((UsernamePasswordAuthUser) identity);
-		} else {
-			exp = getAuthUserFind(identity);
-		}
-		return exp.findRowCount() > 0;
-	}
+//	public static boolean existsByAuthUserIdentity(
+//			final AuthUserIdentity identity) {
+//		final ExpressionList<User> exp;
+//		if (identity instanceof UsernamePasswordAuthUser) {
+//			exp = getUsernamePasswordAuthUserFind((UsernamePasswordAuthUser) identity);
+//		} else {
+//			exp = getAuthUserFind(identity);
+//		}
+//		return exp.findRowCount() > 0;
+//	}
 
-	private static ExpressionList<User> getAuthUserFind(
-			final AuthUserIdentity identity) {
-		return find.where().eq("active", true)
-				.eq("linkedAccounts.providerUserId", identity.getId())
-				.eq("linkedAccounts.providerKey", identity.getProvider());
-	}
+//	private static ExpressionList<User> getAuthUserFind(
+//			final AuthUserIdentity identity) {
+//		return find.where().eq("active", true)
+//				.eq("linkedAccounts.providerUserId", identity.getId())
+//				.eq("linkedAccounts.providerKey", identity.getProvider());
+//	}
 
-	public static User findByAuthUserIdentity(final AuthUserIdentity identity) {
-		if (identity == null) {
-			return null;
-		}
-		if (identity instanceof UsernamePasswordAuthUser) {
-			return findByUsernamePasswordIdentity((UsernamePasswordAuthUser) identity);
-		} else {
-			return getAuthUserFind(identity).findUnique();
-		}
-	}
+//	public static User findByAuthUserIdentity(final AuthUserIdentity identity) {
+//		if (identity == null) {
+//			return null;
+//		}
+//		if (identity instanceof UsernamePasswordAuthUser) {
+//			return findByUsernamePasswordIdentity((UsernamePasswordAuthUser) identity);
+//		} else {
+//			return getAuthUserFind(identity).findUnique();
+//		}
+//	}
 
-	public static User findByUsernamePasswordIdentity(
-			final UsernamePasswordAuthUser identity) {
-		return getUsernamePasswordAuthUserFind(identity).findUnique();
-	}
+//	public static User findByUsernamePasswordIdentity(
+//			final UsernamePasswordAuthUser identity) {
+//		return getUsernamePasswordAuthUserFind(identity).findUnique();
+//	}
 
-	private static ExpressionList<User> getUsernamePasswordAuthUserFind(
-			final UsernamePasswordAuthUser identity) {
-		return getEmailUserFind(identity.getEmail()).eq(
-				"linkedAccounts.providerKey", identity.getProvider());
-	}
+//	private static ExpressionList<User> getUsernamePasswordAuthUserFind(
+//			final UsernamePasswordAuthUser identity) {
+//		return getEmailUserFind(identity.getEmail()).eq(
+//				"linkedAccounts.providerKey", identity.getProvider());
+//	}
 
 	public void merge(final User otherUser) {
 		for (final LinkedAccount acc : otherUser.linkedAccounts) {
@@ -134,8 +134,7 @@ public class User extends Model implements Subject {
 
 	public static User create(final AuthUser authUser) {
 		final User user = new User();
-		user.roles = Collections.singletonList(SecurityRole
-				.findByRoleName(controllers.Application.USER_ROLE));
+		user.roles = Collections.singletonList(db.findByRoleName(controllers.Application.USER_ROLE));
 		// user.permissions = new ArrayList<UserPermission>();
 		// user.permissions.add(UserPermission.findByValue("printers.edit"));
 		user.active = true;
@@ -172,16 +171,17 @@ public class User extends Model implements Subject {
 		  }
 		}
 
-		user.save();
-		user.saveManyToManyAssociations("roles");
+        db.deepSave(user);
+//		user.save();
+//		user.saveManyToManyAssociations("roles");
 		// user.saveManyToManyAssociations("permissions");
 		return user;
 	}
 
-	public static void merge(final AuthUser oldUser, final AuthUser newUser) {
-		User.findByAuthUserIdentity(oldUser).merge(
-				User.findByAuthUserIdentity(newUser));
-	}
+//	public static void merge(final AuthUser oldUser, final AuthUser newUser) {
+//		User.findByAuthUserIdentity(oldUser).merge(
+//				User.findByAuthUserIdentity(newUser));
+//	}
 
 	public Set<String> getProviders() {
 		final Set<String> providerKeys = new HashSet<String>(
@@ -192,37 +192,39 @@ public class User extends Model implements Subject {
 		return providerKeys;
 	}
 
-	public static void addLinkedAccount(final AuthUser oldUser,
-			final AuthUser newUser) {
-		final User u = User.findByAuthUserIdentity(oldUser);
-		u.linkedAccounts.add(LinkedAccount.create(newUser));
-		u.save();
-	}
+//	public static void addLinkedAccount(final AuthUser oldUser,
+//			final AuthUser newUser) {
+//		final User u = User.findByAuthUserIdentity(oldUser);
+//		u.linkedAccounts.add(LinkedAccount.create(newUser));
+//		u.save();
+//	}
 
-	public static void setLastLoginDate(final AuthUser knownUser) {
-		final User u = User.findByAuthUserIdentity(knownUser);
-		u.lastLogin = new Date();
-		u.save();
-	}
+//	public static void setLastLoginDate(final AuthUser knownUser) {
+//		final User u = User.findByAuthUserIdentity(knownUser);
+//		u.lastLogin = new Date();
+//		u.save();
+//	}
 
-	public static User findByEmail(final String email) {
-		return getEmailUserFind(email).findUnique();
-	}
+//	public static User findByEmail(final String email) {
+//		return getEmailUserFind(email).findUnique();
+//	}
 
-	private static ExpressionList<User> getEmailUserFind(final String email) {
-		return find.where().eq("active", true).eq("email", email);
-	}
+//	private static ExpressionList<User> getEmailUserFind(final String email) {
+//		return find.where().eq("active", true).eq("email", email);
+//	}
 
 	public LinkedAccount getAccountByProvider(final String providerKey) {
 		return LinkedAccount.findByProviderKey(this, providerKey);
 	}
 
-	public static void verify(final User unverified) {
-		// You might want to wrap this into a transaction
-		unverified.emailValidated = true;
-		unverified.save();
-		TokenAction.deleteByUser(unverified, Type.EMAIL_VERIFICATION);
-	}
+//	public static void verify(final User unverified) {
+//		// You might want to wrap this into a transaction
+//		unverified.emailValidated = true;
+//		unverified.save();
+//        db.save(unverified);
+//		db.deleteByUser(unverified, Type.EMAIL_VERIFICATION);
+//
+//	}
 
 	public void changePassword(final UsernamePasswordAuthUser authUser,
 			final boolean create) {
@@ -237,13 +239,13 @@ public class User extends Model implements Subject {
 			}
 		}
 		a.providerUserId = authUser.getHashedPassword();
-		a.save();
+        db.save(a);
 	}
 
 	public void resetPassword(final UsernamePasswordAuthUser authUser,
 			final boolean create) {
 		// You might want to wrap this into a transaction
 		this.changePassword(authUser, create);
-		TokenAction.deleteByUser(this, Type.PASSWORD_RESET);
+        db.deleteByUser(this, Type.PASSWORD_RESET);
 	}
 }
